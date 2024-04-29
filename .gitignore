@@ -125,3 +125,6 @@ test.py
 
 # hydra log
 /outputs
+
+# resource
+/codebook/resource
