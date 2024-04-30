@@ -128,3 +128,6 @@ test.py
 
 # resource
 /codebook/resource
+
+# yolo run
+/runs
