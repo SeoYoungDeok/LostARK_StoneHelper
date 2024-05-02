@@ -13,65 +13,68 @@ QMainWindow {
     border-radius: 5px;
 }
 
-QPushButton:enabled {
-    background-color: #006ee6;
-    color: white;
-    width: 300px;
-    height: 80px;
-    font-size: 30px;
-    font-weight: bold;
-    letter-spacing: 8px;
-    border-radius: 10px;
+#increaseEngraving {
+    border-radius: 25px;
+    border: 2px solid #7BD3EA;
 }
 
-QPushButton:disabled {
-    background-color: #999999;
-    color: white;
-    width: 300px;
-    height: 80px;
-    font-size: 30px;
+#decreaseEngraving {
+    border-radius: 25px;
+    border: 2px solid #C74B50;
+}
+
+QPushButton {
+    background-color: #F6F5F2;
+    color: #31363F;
+    font-size: 16px;
     font-weight: bold;
-    letter-spacing: 8px;
-    border-radius: 10px;
+    letter-spacing: 1px;
+    border-radius: 5px;
+    border: 2px solid black;
+    padding: 3px;
+    height: 30px;
+}
+
+QPushButton#enabled {
+    border: 3px solid #EFBC9B;
+}
+
+QPushButton#disabled {
+    border: 1px solid #D9D9D9;
+}
+
+QPushButton#setMonitorBtn  {
+    height: 50px;
 }
 
 QPushButton:hover {
-    background-color: #005ec3;
+    background-color: #ededea;
 }
 
 QPushButton:pressed {
-    background-color: #1a4d7e;
-}
-
-QLabel {
-    color: #31363F;
-    font-size: 20px;
-    font-weight: bold;
+    background-color: #e0e0e0;
 }
 
 QComboBox {
-    background-color: #f5f5f5;
-    color: #333333;
-    border: 1px solid #cccccc;
+    background-color: #F6F5F2;
+    color: #31363F;
+    border: 1px solid #f6f5f2;
+    border-bottom: 1px solid black;
     padding: 5px;
-    border-radius: 3px;
     selection-background-color: #dddddd;
     font-size: 15px;
-    font-weight: bold;
-    width: 270px;
-    height: 20px;
 }
 
 QComboBox::drop-down {
-    width: 20px;
-    height: 20px;
-    background-color: #cccccc;
+    width: 10px;
+    height: 10px;
+    background-color: #f6f5f2;
     subcontrol-position: right;
     subcontrol-origin: padding;
 }
 
 QComboBox::down-arrow {
-    image: url(icon/arrow_down.png);
-    width: 16px;
-    height: 16px;
+    image: url(app/resource/arrow_down.png);
+    width: 10px;
+    height: 10px;
 }
