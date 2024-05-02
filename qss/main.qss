@@ -35,6 +35,18 @@ QPushButton {
     height: 30px;
 }
 
+QPushButton:disabled {
+    background-color: #c8c8c8;
+    color: #31363F;
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    border-radius: 5px;
+    border: 2px solid black;
+    padding: 3px;
+    height: 30px;
+}
+
 QPushButton#enabled {
     border: 3px solid #EFBC9B;
 }
