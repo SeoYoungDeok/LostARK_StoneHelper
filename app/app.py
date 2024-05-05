@@ -1,3 +1,4 @@
+import glob
 import sys
 from pathlib import Path
 
@@ -20,10 +21,11 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from ultralytics import YOLO
 
 
 class SetMonitorWindow(QWidget):
-    def __init__(self, label, monitor_num):
+    def __init__(self, label):
         super().__init__()
 
         self.setWindowTitle("화면세팅")
@@ -31,16 +33,15 @@ class SetMonitorWindow(QWidget):
         self.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
 
         self.label = label
-        self.monitor = monitor_num
 
         layout = QVBoxLayout()
 
         self.img_label = QLabel()
         img = cv2.imread("app/resource/no_image.png")
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, (320, 320))
+        img = cv2.resize(img, (320, 180))
 
-        img = QImage(img.data, 320, 320, 320 * 3, QImage.Format.Format_RGB888)
+        img = QImage(img.data, 320, 180, 320 * 3, QImage.Format.Format_RGB888)
         self.pixmap = QPixmap.fromImage(img)
         self.img_label.setPixmap(self.pixmap)
         self.img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -64,7 +65,7 @@ class SetMonitorWindow(QWidget):
         layout.addWidget(self.submit_button)
 
         self.setLayout(layout)
-        self.setFixedSize(QSize(360, 360 + 100 * (len(self.monitors) + 1)))
+        self.setFixedSize(QSize(360, 180 + 100 * (len(self.monitors) + 1)))
 
     def select_monitor_button_clicked(self, _, moniter_number):
         for i, button in enumerate(self.monitor_button_list):
@@ -74,27 +75,23 @@ class SetMonitorWindow(QWidget):
                 button.setStyleSheet("background-color: #999999;")
 
         self.monitor_number = moniter_number
-        self.monitor = self.monitors[moniter_number][0]
-        margin_w, margin_h, w, h = win32api.GetMonitorInfo(self.monitor)["Monitor"]
-
-        self.left = ((w - margin_w - 1080) // 2) + margin_w
-        self.top = ((h - margin_h - 1080) // 2) + margin_h
-        self.right = self.left + 1080
-        self.bottom = self.top + 1080
+        monitor = self.monitors[moniter_number][0]
+        self.left, self.top, self.right, self.bottom = win32api.GetMonitorInfo(monitor)[
+            "Monitor"
+        ]
 
         img = ImageGrab.grab(
             bbox=(self.left, self.top, self.right, self.bottom), all_screens=True
         )
         img = np.array(img, dtype=np.float32)
-        img = cv2.resize(img, (320, 320))
+        img = cv2.resize(img, (320, 180))
         img = np.array(img, dtype=np.uint8)
 
-        img = QImage(img.data, 320, 320, 320 * 3, QImage.Format.Format_RGB888)
+        img = QImage(img.data, 320, 180, 320 * 3, QImage.Format.Format_RGB888)
         self.pixmap = QPixmap.fromImage(img)
         self.img_label.setPixmap(self.pixmap)
 
         self.label.setText(f"모니터 {self.monitor_number+1}")
-        self.monitor = self.monitor_number
 
         self.submit_button.setEnabled(True)
 
@@ -105,6 +102,10 @@ class SetMonitorWindow(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.model = YOLO("app/best.pt")
+        self.engraving_path = glob.glob("app/resource/increase_engraving*") + glob.glob(
+            "app/resource/decrease_engraving*"
+        )
 
         self.setWindowTitle("LostARK StoneHelper")
         self.setFixedSize(QSize(560, 460))
@@ -198,9 +199,7 @@ class MainWindow(QMainWindow):
 
         widget.setLayout(layout)
 
-        self.set_monitor_window = SetMonitorWindow(
-            self.lb_select_monitor, self.monitor_num
-        )
+        self.set_monitor_window = SetMonitorWindow(self.lb_select_monitor)
         return widget
 
     def setDetectionLayout(self):
@@ -208,11 +207,14 @@ class MainWindow(QMainWindow):
         widget.setFixedSize(QSize(540, 140))
         widget.setObjectName("layout")
 
-        label = QLabel("인식하고 세공 시작")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.btn_detect = QPushButton("인식하고 세공 시작")
+        self.btn_detect.setStyleSheet(
+            "border: 0px; font-size:32px; font-weight: bold; height: 100%;"
+        )
+        self.btn_detect.clicked.connect(self.detectButtonClicked)
 
         layout = QVBoxLayout()
-        layout.addWidget(label)
+        layout.addWidget(self.btn_detect)
 
         widget.setLayout(layout)
         return widget
@@ -281,6 +283,85 @@ class MainWindow(QMainWindow):
 
     def setMonitorButtonClicked(self):
         self.set_monitor_window.show()
+
+    def detectButtonClicked(self):
+        left = self.set_monitor_window.left
+        top = self.set_monitor_window.top
+        right = self.set_monitor_window.right
+        bottom = self.set_monitor_window.bottom
+
+        if self.ckb_21_9.isChecked:
+            margin_w = ((right - left) - ((right - left) * 0.75)) / 2
+            margin_h = ((bottom - top) - ((bottom - top) * 0.75)) / 2
+            left += margin_w
+            top += margin_h
+            right -= margin_w
+            bottom -= margin_h
+
+        img = ImageGrab.grab(bbox=(left, top, right, bottom), all_screens=True)
+
+        result = self.model.predict(img, imgsz=736, device="cpu", conf=0.5)
+
+        xywh = result[0].boxes.xywh.numpy()
+        sort_idx = np.argsort(xywh[:, 1])
+        xywh = xywh[sort_idx, :]
+        cls_idx = result[0].boxes.cls[sort_idx]
+
+        line1, line2, line3 = np.vsplit(xywh, 3)
+        line1 = line1[np.argsort(line1[:, 0]), :]
+        line2 = line2[np.argsort(line2[:, 0]), :]
+        line3 = line3[np.argsort(line3[:, 0]), :]
+
+        self.engraving_list[0].setPixmap(QPixmap(self.engraving_path[int(cls_idx[0])]))
+        self.engraving_list[1].setPixmap(QPixmap(self.engraving_path[int(cls_idx[11])]))
+        self.engraving_list[2].setPixmap(QPixmap(self.engraving_path[int(cls_idx[22])]))
+
+        img = np.array(img)
+        for i, (box1, box2, box3) in enumerate(zip(line1[1:], line2[1:], line3[1:])):
+            box1 = box1.astype(np.int32)
+            l, t, w, h = (
+                box1[0] - int(box1[2] / 2),
+                box1[1] - int(box1[3] / 2),
+                box1[2],
+                box1[3],
+            )
+            box1_mean = img[t : t + h, l : l + w, 2].mean()
+            if box1_mean > 90:  # normal
+                self.point_list1[i].setPixmap(QPixmap("app/resource/normal.png"))
+            elif box1_mean > 65:  # increase
+                self.point_list1[i].setPixmap(QPixmap("app/resource/increase.png"))
+            elif box1_mean < 35:  # fail
+                self.point_list1[i].setPixmap(QPixmap("app/resource/fail.png"))
+
+            box2 = box2.astype(np.int32)
+            l, t, w, h = (
+                box2[0] - int(box2[2] / 2),
+                box2[1] - int(box2[3] / 2),
+                box2[2],
+                box2[3],
+            )
+            box2_mean = img[t : t + h, l : l + w, 2].mean()
+            if box2_mean > 90:  # normal
+                self.point_list2[i].setPixmap(QPixmap("app/resource/normal.png"))
+            elif box2_mean > 65:  # increase
+                self.point_list2[i].setPixmap(QPixmap("app/resource/increase.png"))
+            elif box2_mean < 35:  # fail
+                self.point_list2[i].setPixmap(QPixmap("app/resource/fail.png"))
+
+            box3 = box3.astype(np.int32)
+            l, t, w, h = (
+                box3[0] - int(box3[2] / 2),
+                box3[1] - int(box3[3] / 2),
+                box3[2],
+                box3[3],
+            )
+            box3_mean = img[t : t + h, l : l + w, 0].mean()
+            if box3_mean > 65:  # normal
+                self.point_list3[i].setPixmap(QPixmap("app/resource/normal.png"))
+            elif box3_mean > 40:  # decrease
+                self.point_list3[i].setPixmap(QPixmap("app/resource/decrease.png"))
+            elif box3_mean < 30:  # fail
+                self.point_list3[i].setPixmap(QPixmap("app/resource/fail.png"))
 
 
 app = QApplication(sys.argv)
