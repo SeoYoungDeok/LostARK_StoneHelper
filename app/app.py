@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import win32api
 from PIL import ImageGrab
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QSize, Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
@@ -103,9 +103,14 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.model = YOLO("app/best.pt")
+        self.table_97 = np.load("app/table_97.npy")
+        self.table_77 = np.load("app/table_77.npy")
+        self.prob = [0.75, 0.65, 0.55, 0.45, 0.35, 0.25]
+        self.p = 0
         self.engraving_path = glob.glob("app/resource/increase_engraving*") + glob.glob(
             "app/resource/decrease_engraving*"
         )
+        self.p_img_path = glob.glob("app/resource/p*.jpg")
 
         self.setWindowTitle("LostARK StoneHelper")
         self.setFixedSize(QSize(560, 460))
@@ -151,14 +156,14 @@ class MainWindow(QMainWindow):
         )
         self.cmb_engraving = QComboBox()
         # fmt: off
-        engraving = ["7 각인 선택", "각성", "강령술", "강화 방패", "결투의 대가", "구슬동자", "굳은 의지", "급소타격", "기습의 대가", "긴급 구조", "달인의 저력", "돌격대장", "마나 효율 증가", "마나의 흐름", "바리케이드", "번개의 분노", "부러진 뼈", "분쇄의 주먹", "불굴", "선수필승", "속전속결", "슈퍼 차지", "승부사", "시선 집중", "실드 관통", "아드레날린", "안정된 상태", "약자 무시", "에테르 포식자", "여신의 가호", "예리한 둔기", "원한", "위기 모면", "저주받은 인형", "전문의", "정기 흡수", "정밀 단도", "중갑 착용", "질량 증가", "최대 마나 증가", "추진력", "타격의 대가", "탈출의 명수", "폭발물 전문가"]
+        self.engraving_name_list = ["7 각인 선택", "각성", "강령술", "강화 방패", "결투의 대가", "구슬동자", "굳은 의지", "급소타격", "기습의 대가", "긴급 구조", "달인의 저력", "돌격대장", "마나 효율 증가", "마나의 흐름", "바리케이드", "번개의 분노", "부러진 뼈", "분쇄의 주먹", "불굴", "선수필승", "속전속결", "슈퍼 차지", "승부사", "시선 집중", "실드 관통", "아드레날린", "안정된 상태", "약자 무시", "에테르 포식자", "여신의 가호", "예리한 둔기", "원한", "위기 모면", "저주받은 인형", "전문의", "정기 흡수", "정밀 단도", "중갑 착용", "질량 증가", "최대 마나 증가", "추진력", "타격의 대가", "탈출의 명수", "폭발물 전문가"]
         # fmt: on
         self.engraving7 = "7 각인 선택"
-        self.cmb_engraving.addItems(engraving)
+        self.cmb_engraving.addItems(self.engraving_name_list)
         self.cmb_engraving.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         line_edit = QLineEdit()
         self.cmb_engraving.setLineEdit(line_edit)
-        completer = QCompleter(engraving)
+        completer = QCompleter(self.engraving_name_list)
         completer.setCompletionMode(QCompleter.CompletionMode.UnfilteredPopupCompletion)
         self.cmb_engraving.setCompleter(completer)
         self.cmb_engraving.currentTextChanged.connect(self.engravingComboboxChanged)
@@ -181,7 +186,6 @@ class MainWindow(QMainWindow):
         btn_select_monitor.clicked.connect(self.setMonitorButtonClicked)
         self.lb_select_monitor = QLabel("선택된 모니터 없음")
         self.lb_select_monitor.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.monitor_num = -1
         self.ckb_21_9 = QCheckBox()
         lb_21_9 = QLabel("21:9 사용여부")
 
@@ -237,14 +241,15 @@ class MainWindow(QMainWindow):
         for n in range(3):
             h_layout = QHBoxLayout()
             lb_engraving = QLabel()
-            if n < 2:
-                lb_engraving.setStyleSheet(
-                    "border-radius: 25px; border: 2px solid #7BD3EA;"
-                )
-            else:
-                lb_engraving.setStyleSheet(
-                    "border-radius: 25px; border: 2px solid #C74B50;"
-                )
+            # if n < 2:
+            #     lb_engraving.setStyleSheet(
+            #         "border-radius: 25px; border: 2px solid #7BD3EA;"
+            #     )
+            # else:
+            #     lb_engraving.setStyleSheet(
+            #         "border-radius: 25px; border: 2px solid #C74B50;"
+            #     )
+            lb_engraving.setStyleSheet("border-radius: 25px; border: 2px solid black;")
             lb_engraving.setFixedSize(50, 50)
             lb_engraving.setScaledContents(True)
             h_layout.addWidget(lb_engraving)
@@ -281,43 +286,84 @@ class MainWindow(QMainWindow):
     def engravingComboboxChanged(self):
         self.engraving7 = self.cmb_engraving.currentText()
 
+        try:
+            if self.engraving_name_list.index(self.engraving7) - 1 == int(
+                self.cls_idx[0]
+            ):
+                self.mode = "79"
+            elif self.engraving_name_list.index(self.engraving7) - 1 == int(
+                self.cls_idx[11]
+            ):
+                self.mode = "97"
+        except:
+            pass
+
     def setMonitorButtonClicked(self):
         self.set_monitor_window.show()
 
     def detectButtonClicked(self):
-        left = self.set_monitor_window.left
-        top = self.set_monitor_window.top
-        right = self.set_monitor_window.right
-        bottom = self.set_monitor_window.bottom
+        self.left = self.set_monitor_window.left
+        self.top = self.set_monitor_window.top
+        self.right = self.set_monitor_window.right
+        self.bottom = self.set_monitor_window.bottom
 
-        if self.ckb_21_9.isChecked:
-            margin_w = ((right - left) - ((right - left) * 0.75)) / 2
-            margin_h = ((bottom - top) - ((bottom - top) * 0.75)) / 2
-            left += margin_w
-            top += margin_h
-            right -= margin_w
-            bottom -= margin_h
+        if self.ckb_21_9.isChecked():
+            margin_w = (
+                (self.right - self.left) - ((self.right - self.left) * 0.75)
+            ) / 2
+            margin_h = (
+                (self.bottom - self.top) - ((self.bottom - self.top) * 0.75)
+            ) / 2
+            self.left += margin_w
+            self.top += margin_h
+            self.right -= margin_w
+            self.bottom -= margin_h
 
-        img = ImageGrab.grab(bbox=(left, top, right, bottom), all_screens=True)
+        img = ImageGrab.grab(
+            bbox=(self.left, self.top, self.right, self.bottom), all_screens=True
+        )
 
         result = self.model.predict(img, imgsz=736, device="cpu", conf=0.5)
 
         xywh = result[0].boxes.xywh.numpy()
         sort_idx = np.argsort(xywh[:, 1])
         xywh = xywh[sort_idx, :]
-        cls_idx = result[0].boxes.cls[sort_idx]
+        self.cls_idx = result[0].boxes.cls[sort_idx]
 
         line1, line2, line3 = np.vsplit(xywh, 3)
-        line1 = line1[np.argsort(line1[:, 0]), :]
-        line2 = line2[np.argsort(line2[:, 0]), :]
-        line3 = line3[np.argsort(line3[:, 0]), :]
+        self.line1 = line1[np.argsort(line1[:, 0]), :]
+        self.line2 = line2[np.argsort(line2[:, 0]), :]
+        self.line3 = line3[np.argsort(line3[:, 0]), :]
 
-        self.engraving_list[0].setPixmap(QPixmap(self.engraving_path[int(cls_idx[0])]))
-        self.engraving_list[1].setPixmap(QPixmap(self.engraving_path[int(cls_idx[11])]))
-        self.engraving_list[2].setPixmap(QPixmap(self.engraving_path[int(cls_idx[22])]))
+        self.engraving_list[0].setPixmap(
+            QPixmap(self.engraving_path[int(self.cls_idx[0])])
+        )
+        self.engraving_list[1].setPixmap(
+            QPixmap(self.engraving_path[int(self.cls_idx[11])])
+        )
+        self.engraving_list[2].setPixmap(
+            QPixmap(self.engraving_path[int(self.cls_idx[22])])
+        )
 
+        if self.engraving_name_list.index(self.engraving7) - 1 == int(self.cls_idx[0]):
+            self.mode = "79"
+        elif self.engraving_name_list.index(self.engraving7) - 1 == int(
+            self.cls_idx[11]
+        ):
+            self.mode = "97"
+        else:
+            self.mode = "77"
+
+        self.e1_active = 0
+        self.e1_try = 0
+        self.e2_active = 0
+        self.e2_try = 0
+        self.e3_active = 0
+        self.e3_try = 0
         img = np.array(img)
-        for i, (box1, box2, box3) in enumerate(zip(line1[1:], line2[1:], line3[1:])):
+        for i, (box1, box2, box3) in enumerate(
+            zip(self.line1[1:], self.line2[1:], self.line3[1:])
+        ):
             box1 = box1.astype(np.int32)
             l, t, w, h = (
                 box1[0] - int(box1[2] / 2),
@@ -330,8 +376,11 @@ class MainWindow(QMainWindow):
                 self.point_list1[i].setPixmap(QPixmap("app/resource/normal.png"))
             elif box1_mean > 65:  # increase
                 self.point_list1[i].setPixmap(QPixmap("app/resource/increase.png"))
+                self.e1_try += 1
+                self.e1_active += 1
             elif box1_mean < 35:  # fail
                 self.point_list1[i].setPixmap(QPixmap("app/resource/fail.png"))
+                self.e1_try += 1
 
             box2 = box2.astype(np.int32)
             l, t, w, h = (
@@ -345,8 +394,11 @@ class MainWindow(QMainWindow):
                 self.point_list2[i].setPixmap(QPixmap("app/resource/normal.png"))
             elif box2_mean > 65:  # increase
                 self.point_list2[i].setPixmap(QPixmap("app/resource/increase.png"))
+                self.e2_try += 1
+                self.e2_active += 1
             elif box2_mean < 35:  # fail
                 self.point_list2[i].setPixmap(QPixmap("app/resource/fail.png"))
+                self.e2_try += 1
 
             box3 = box3.astype(np.int32)
             l, t, w, h = (
@@ -360,8 +412,481 @@ class MainWindow(QMainWindow):
                 self.point_list3[i].setPixmap(QPixmap("app/resource/normal.png"))
             elif box3_mean > 40:  # decrease
                 self.point_list3[i].setPixmap(QPixmap("app/resource/decrease.png"))
+                self.e3_try += 1
+                self.e3_active += 1
             elif box3_mean < 30:  # fail
                 self.point_list3[i].setPixmap(QPixmap("app/resource/fail.png"))
+                self.e3_try += 1
+
+        height, width, _ = img.shape
+        print(img.shape)
+        box1 = self.line1[-1].astype(np.int32)
+        l, t, w, h = (
+            int(box1[0] + (width * 0.0475)),
+            int(box1[1] - (height * 0.0675)),
+            int(width * 0.022),
+            int(height * 0.021),
+        )
+        x = img[t : t + h, l : l + w, :]
+        src_gray = cv2.cvtColor(x, cv2.COLOR_RGB2GRAY)
+        _, x = cv2.threshold(src_gray, 127, 255, cv2.THRESH_TOZERO | cv2.THRESH_OTSU)
+        _, x = cv2.threshold(x, 127, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+
+        y = []
+        for i, p in enumerate(self.p_img_path):
+            p_img = cv2.imread(p)
+            src_gray = cv2.cvtColor(p_img, cv2.COLOR_BGR2GRAY)
+            _, p_img = cv2.threshold(
+                src_gray, 127, 255, cv2.THRESH_TOZERO | cv2.THRESH_OTSU
+            )
+            _, p_img = cv2.threshold(
+                p_img, 127, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU
+            )
+            y.append(p_img)
+
+        max_idx = -1
+        max_ccoeff = -1
+
+        for i in range(6):
+            res = cv2.matchTemplate(x, y[i], cv2.TM_CCOEFF_NORMED)
+
+            if res.max() > max_ccoeff:
+                max_idx = i
+                max_ccoeff = res.max()
+
+        self.p = max_idx
+        print(self.p)
+        self.select_choice()
+
+        self.timer = QTimer()
+        self.timer.start(100)
+        self.timer.timeout.connect(self.craft_ability)
+
+    def craft_ability(self):
+        img = ImageGrab.grab(
+            bbox=(self.left, self.top, self.right, self.bottom), all_screens=True
+        )
+        img = np.array(img)
+
+        if self.e1_try + 1 <= 10:
+            box1 = self.line1[self.e1_try + 1]
+            box1 = box1.astype(np.int32)
+            l, t, w, h = (
+                box1[0] - int(box1[2] / 2),
+                box1[1] - int(box1[3] / 2),
+                box1[2],
+                box1[3],
+            )
+            box1_mean = img[t : t + h, l : l + w, 2].mean()
+            if box1_mean > 90:  # normal
+                pass
+            elif box1_mean > 65:  # increase
+                self.point_list1[self.e1_try].setPixmap(
+                    QPixmap("app/resource/increase.png")
+                )
+                self.e1_try += 1
+                self.e1_active += 1
+                self.p = self.p + 1 if self.p + 1 <= 5 else self.p
+            elif box1_mean < 35:  # fail
+                self.point_list1[self.e1_try].setPixmap(
+                    QPixmap("app/resource/fail.png")
+                )
+                self.e1_try += 1
+                self.p = self.p - 1 if self.p - 1 >= 0 else self.p
+
+        if self.e2_try + 1 <= 10:
+            box2 = self.line2[self.e2_try + 1]
+            box2 = box2.astype(np.int32)
+            l, t, w, h = (
+                box2[0] - int(box2[2] / 2),
+                box2[1] - int(box2[3] / 2),
+                box2[2],
+                box2[3],
+            )
+            box2_mean = img[t : t + h, l : l + w, 2].mean()
+            if box2_mean > 90:  # normal
+                pass
+            elif box2_mean > 65:  # increase
+                self.point_list2[self.e2_try].setPixmap(
+                    QPixmap("app/resource/increase.png")
+                )
+                self.e2_try += 1
+                self.e2_active += 1
+                self.p = self.p + 1 if self.p + 1 <= 5 else self.p
+            elif box2_mean < 35:  # fail
+                self.point_list2[self.e2_try].setPixmap(
+                    QPixmap("app/resource/fail.png")
+                )
+                self.e2_try += 1
+                self.p = self.p - 1 if self.p - 1 >= 0 else self.p
+
+        if self.e3_try + 1 <= 10:
+            box3 = self.line3[self.e3_try + 1]
+            box3 = box3.astype(np.int32)
+            l, t, w, h = (
+                box3[0] - int(box3[2] / 2),
+                box3[1] - int(box3[3] / 2),
+                box3[2],
+                box3[3],
+            )
+            box3_mean = img[t : t + h, l : l + w, 0].mean()
+            if box3_mean > 65:  # normal
+                pass
+            elif box3_mean > 40:  # decrease
+                self.point_list3[self.e3_try].setPixmap(
+                    QPixmap("app/resource/decrease.png")
+                )
+                self.e3_try += 1
+                self.e3_active += 1
+                self.p = self.p + 1 if self.p + 1 <= 5 else self.p
+            elif box3_mean < 30:  # fail
+                self.point_list3[self.e3_try].setPixmap(
+                    QPixmap("app/resource/fail.png")
+                )
+                self.e3_try += 1
+                self.p = self.p - 1 if self.p - 1 >= 0 else self.p
+
+        self.select_choice()
+
+    def select_choice(self):
+        if self.mode == "97":
+            prob1 = 0
+            prob2 = 0
+            prob3 = 0
+
+            if self.e1_active <= 9 and self.e1_try <= 9:
+                prob1 = (
+                    self.prob[self.p]
+                    * self.table_97[
+                        self.e1_active + 1,
+                        self.e1_try + 1,
+                        self.e2_active,
+                        self.e2_try,
+                        self.e3_active,
+                        self.e3_try,
+                        self.p + 1 if self.p + 1 <= 5 else self.p,
+                    ]
+                ) + (
+                    (1 - self.prob[self.p])
+                    * self.table_97[
+                        self.e1_active,
+                        self.e1_try + 1,
+                        self.e2_active,
+                        self.e2_try,
+                        self.e3_active,
+                        self.e3_try,
+                        self.p - 1 if self.p - 1 >= 0 else self.p,
+                    ]
+                )
+
+            if self.e2_active <= 9 and self.e2_try <= 9:
+                prob2 = (
+                    self.prob[self.p]
+                    * self.table_97[
+                        self.e1_active,
+                        self.e1_try,
+                        self.e2_active + 1,
+                        self.e2_try + 1,
+                        self.e3_active,
+                        self.e3_try,
+                        self.p + 1 if self.p + 1 <= 5 else self.p,
+                    ]
+                ) + (
+                    (1 - self.prob[self.p])
+                    * self.table_97[
+                        self.e1_active,
+                        self.e1_try,
+                        self.e2_active,
+                        self.e2_try + 1,
+                        self.e3_active,
+                        self.e3_try,
+                        self.p - 1 if self.p - 1 >= 0 else self.p,
+                    ]
+                )
+
+            if self.e3_active <= 9 and self.e3_try <= 9:
+                prob3 = (
+                    self.prob[self.p]
+                    * self.table_97[
+                        self.e1_active,
+                        self.e1_try,
+                        self.e2_active,
+                        self.e2_try,
+                        self.e3_active + 1,
+                        self.e3_try + 1,
+                        self.p + 1 if self.p + 1 <= 5 else self.p,
+                    ]
+                ) + (
+                    (1 - self.prob[self.p])
+                    * self.table_97[
+                        self.e1_active,
+                        self.e1_try,
+                        self.e2_active,
+                        self.e2_try,
+                        self.e3_active,
+                        self.e3_try + 1,
+                        self.p - 1 if self.p - 1 >= 0 else self.p,
+                    ]
+                )
+
+            choice = 0 if prob1 >= prob2 else 1 if prob2 > prob3 else 2
+            print(f"97 : {choice}")
+            if prob1 >= prob2:
+                self.engraving_list[0].setStyleSheet(
+                    "border-radius: 25px; border: 4px solid lime;"
+                )
+                self.engraving_list[1].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+                self.engraving_list[2].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+            elif prob2 > prob3:
+                self.engraving_list[0].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+                self.engraving_list[1].setStyleSheet(
+                    "border-radius: 25px; border: 4px solid lime;"
+                )
+                self.engraving_list[2].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+            else:
+                self.engraving_list[0].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+                self.engraving_list[1].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+                self.engraving_list[2].setStyleSheet(
+                    "border-radius: 25px; border: 4px solid lime;"
+                )
+
+        elif self.mode == "79":
+            prob1 = 0
+            prob2 = 0
+            prob3 = 0
+
+            if self.e1_active <= 9 and self.e1_try <= 9:
+                prob1 = (
+                    self.prob[self.p]
+                    * self.table_97[
+                        self.e2_active,
+                        self.e2_try,
+                        self.e1_active + 1,
+                        self.e1_try + 1,
+                        self.e3_active,
+                        self.e3_try,
+                        self.p + 1 if self.p + 1 <= 5 else self.p,
+                    ]
+                ) + (
+                    (1 - self.prob[self.p])
+                    * self.table_97[
+                        self.e2_active,
+                        self.e2_try,
+                        self.e1_active,
+                        self.e1_try + 1,
+                        self.e3_active,
+                        self.e3_try,
+                        self.p - 1 if self.p - 1 >= 0 else self.p,
+                    ]
+                )
+
+            if self.e2_active <= 9 and self.e2_try <= 9:
+                prob2 = (
+                    self.prob[self.p]
+                    * self.table_97[
+                        self.e2_active + 1,
+                        self.e2_try + 1,
+                        self.e1_active,
+                        self.e1_try,
+                        self.e3_active,
+                        self.e3_try,
+                        self.p + 1 if self.p + 1 <= 5 else self.p,
+                    ]
+                ) + (
+                    (1 - self.prob[self.p])
+                    * self.table_97[
+                        self.e2_active,
+                        self.e2_try + 1,
+                        self.e1_active,
+                        self.e1_try,
+                        self.e3_active,
+                        self.e3_try,
+                        self.p - 1 if self.p - 1 >= 0 else self.p,
+                    ]
+                )
+
+            if self.e3_active <= 9 and self.e3_try <= 9:
+                prob3 = (
+                    self.prob[self.p]
+                    * self.table_97[
+                        self.e2_active,
+                        self.e2_try,
+                        self.e1_active,
+                        self.e1_try,
+                        self.e3_active + 1,
+                        self.e3_try + 1,
+                        self.p + 1 if self.p + 1 <= 5 else self.p,
+                    ]
+                ) + (
+                    (1 - self.prob[self.p])
+                    * self.table_97[
+                        self.e2_active,
+                        self.e2_try,
+                        self.e1_active,
+                        self.e1_try,
+                        self.e3_active,
+                        self.e3_try + 1,
+                        self.p - 1 if self.p - 1 >= 0 else self.p,
+                    ]
+                )
+
+            choice = 0 if prob1 >= prob2 else 1 if prob2 > prob3 else 2
+            print(f"79 : {choice}")
+            if prob1 >= prob2:
+                self.engraving_list[0].setStyleSheet(
+                    "border-radius: 25px; border: 4px solid lime;"
+                )
+                self.engraving_list[1].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+                self.engraving_list[2].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+            elif prob2 > prob3:
+                self.engraving_list[0].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+                self.engraving_list[1].setStyleSheet(
+                    "border-radius: 25px; border: 4px solid lime;"
+                )
+                self.engraving_list[2].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+            else:
+                self.engraving_list[0].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+                self.engraving_list[1].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+                self.engraving_list[2].setStyleSheet(
+                    "border-radius: 25px; border: 4px solid lime;"
+                )
+
+        elif self.mode == "77":
+            prob1 = 0
+            prob2 = 0
+            prob3 = 0
+
+            if self.e1_active <= 9 and self.e1_try <= 9:
+                prob1 = (
+                    self.prob[self.p]
+                    * self.table_77[
+                        self.e1_active + 1,
+                        self.e1_try + 1,
+                        self.e2_active,
+                        self.e2_try,
+                        self.e3_active,
+                        self.e3_try,
+                        self.p + 1 if self.p + 1 <= 5 else self.p,
+                    ]
+                ) + (
+                    (1 - self.prob[self.p])
+                    * self.table_77[
+                        self.e1_active,
+                        self.e1_try + 1,
+                        self.e2_active,
+                        self.e2_try,
+                        self.e3_active,
+                        self.e3_try,
+                        self.p - 1 if self.p - 1 >= 0 else self.p,
+                    ]
+                )
+
+            if self.e2_active <= 9 and self.e2_try <= 9:
+                prob2 = (
+                    self.prob[self.p]
+                    * self.table_77[
+                        self.e1_active,
+                        self.e1_try,
+                        self.e2_active + 1,
+                        self.e2_try + 1,
+                        self.e3_active,
+                        self.e3_try,
+                        self.p + 1 if self.p + 1 <= 5 else self.p,
+                    ]
+                ) + (
+                    (1 - self.prob[self.p])
+                    * self.table_77[
+                        self.e1_active,
+                        self.e1_try,
+                        self.e2_active,
+                        self.e2_try + 1,
+                        self.e3_active,
+                        self.e3_try,
+                        self.p - 1 if self.p - 1 >= 0 else self.p,
+                    ]
+                )
+
+            if self.e3_active <= 9 and self.e3_try <= 9:
+                prob3 = (
+                    self.prob[self.p]
+                    * self.table_77[
+                        self.e1_active,
+                        self.e1_try,
+                        self.e2_active,
+                        self.e2_try,
+                        self.e3_active + 1,
+                        self.e3_try + 1,
+                        self.p + 1 if self.p + 1 <= 5 else self.p,
+                    ]
+                ) + (
+                    (1 - self.prob[self.p])
+                    * self.table_77[
+                        self.e1_active,
+                        self.e1_try,
+                        self.e2_active,
+                        self.e2_try,
+                        self.e3_active,
+                        self.e3_try + 1,
+                        self.p - 1 if self.p - 1 >= 0 else self.p,
+                    ]
+                )
+
+            choice = 0 if prob1 >= prob2 else 1 if prob2 > prob3 else 2
+            print(f"77 : {choice}")
+            if prob1 >= prob2:
+                self.engraving_list[0].setStyleSheet(
+                    "border-radius: 25px; border: 4px solid lime;"
+                )
+                self.engraving_list[1].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+                self.engraving_list[2].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+            elif prob2 > prob3:
+                self.engraving_list[0].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+                self.engraving_list[1].setStyleSheet(
+                    "border-radius: 25px; border: 4px solid lime;"
+                )
+                self.engraving_list[2].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+            else:
+                self.engraving_list[0].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+                self.engraving_list[1].setStyleSheet(
+                    "border-radius: 25px; border: 2px solid black;"
+                )
+                self.engraving_list[2].setStyleSheet(
+                    "border-radius: 25px; border: 4px solid lime;"
+                )
 
 
 app = QApplication(sys.argv)
