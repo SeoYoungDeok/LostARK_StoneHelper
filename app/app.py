@@ -419,7 +419,6 @@ class MainWindow(QMainWindow):
                 self.e3_try += 1
 
         height, width, _ = img.shape
-        print(img.shape)
         box1 = self.line1[-1].astype(np.int32)
         l, t, w, h = (
             int(box1[0] + (width * 0.0475)),
@@ -455,7 +454,7 @@ class MainWindow(QMainWindow):
                 max_ccoeff = res.max()
 
         self.p = max_idx
-        print(self.p)
+
         self.select_choice()
 
         self.timer = QTimer()
@@ -629,8 +628,6 @@ class MainWindow(QMainWindow):
                     ]
                 )
 
-            choice = 0 if prob1 >= prob2 else 1 if prob2 > prob3 else 2
-            print(f"97 : {choice}")
             if prob1 >= prob2:
                 self.engraving_list[0].setStyleSheet(
                     "border-radius: 25px; border: 4px solid lime;"
@@ -742,8 +739,6 @@ class MainWindow(QMainWindow):
                     ]
                 )
 
-            choice = 0 if prob1 >= prob2 else 1 if prob2 > prob3 else 2
-            print(f"79 : {choice}")
             if prob1 >= prob2:
                 self.engraving_list[0].setStyleSheet(
                     "border-radius: 25px; border: 4px solid lime;"
@@ -855,8 +850,6 @@ class MainWindow(QMainWindow):
                     ]
                 )
 
-            choice = 0 if prob1 >= prob2 else 1 if prob2 > prob3 else 2
-            print(f"77 : {choice}")
             if prob1 >= prob2:
                 self.engraving_list[0].setStyleSheet(
                     "border-radius: 25px; border: 4px solid lime;"
