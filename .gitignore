@@ -125,3 +125,10 @@ test.py
 
 # hydra log
 /outputs
+
+# resource
+/codebook/resource
+/app/resource
+
+# yolo run
+/runs

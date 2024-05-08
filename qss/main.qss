@@ -1,0 +1,92 @@
+QMainWindow {
+    background-color: #F0EBE3;
+    color: #31363F;
+}
+
+#setMonitorWindow {
+    background-color: #F0EBE3;
+    color: #31363F;
+}
+
+#layout {
+    background-color: #F6F5F2;
+    border-radius: 5px;
+}
+
+#increaseEngraving {
+    border-radius: 25px;
+    border: 2px solid #7BD3EA;
+}
+
+#decreaseEngraving {
+    border-radius: 25px;
+    border: 2px solid #C74B50;
+}
+
+QPushButton {
+    background-color: #F6F5F2;
+    color: #31363F;
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    border-radius: 5px;
+    border: 2px solid black;
+    padding: 3px;
+    height: 30px;
+}
+
+QPushButton:disabled {
+    background-color: #c8c8c8;
+    color: #31363F;
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    border-radius: 5px;
+    border: 2px solid black;
+    padding: 3px;
+    height: 30px;
+}
+
+QPushButton#enabled {
+    border: 3px solid #EFBC9B;
+}
+
+QPushButton#disabled {
+    border: 1px solid #D9D9D9;
+}
+
+QPushButton#setMonitorBtn  {
+    height: 50px;
+}
+
+QPushButton:hover {
+    background-color: #ededea;
+}
+
+QPushButton:pressed {
+    background-color: #e0e0e0;
+}
+
+QComboBox {
+    background-color: #F6F5F2;
+    color: #31363F;
+    border: 1px solid #f6f5f2;
+    border-bottom: 1px solid black;
+    padding: 5px;
+    selection-background-color: #dddddd;
+    font-size: 15px;
+}
+
+QComboBox::drop-down {
+    width: 10px;
+    height: 10px;
+    background-color: #f6f5f2;
+    subcontrol-position: right;
+    subcontrol-origin: padding;
+}
+
+QComboBox::down-arrow {
+    image: url(app/resource/arrow_down.png);
+    width: 10px;
+    height: 10px;
+}
